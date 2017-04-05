@@ -1,3 +1,8 @@
+/*
+Authors: Yanis Khati , Nadir Faci
+*/
+
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -15,7 +20,7 @@ using namespace std;
 
 
 char* ip;			// IP du serveur
-int port;			// Port d'écoute
+char* portServeur;			// Port d'écoute
 
 // Fonction qui demande au client les informations du serveur
 void intialiserClient() {
@@ -25,12 +30,12 @@ void intialiserClient() {
 	cin >> ip;
 
 	cout << "Veuillez entrer un port du serveur entre 10000 et 10050" << endl;
-	cin >> port;
+	cin >> portServeur;
 
-	while ((port < 10000) | (port > 10050))
+	while (((int)portServeur < 10000) | ((int)portServeur > 10050))
 	{
 		cout << "Numéro de port érroné. Veuillez entrer un port d'écoute entre 10000 et 10050" << endl;
-		cin >> port;
+		cin >> portServeur;
 	}
 }
 
@@ -43,8 +48,9 @@ int __cdecl main(int argc, char **argv)
 	struct addrinfo *result = NULL,
 		*ptr = NULL,
 		hints;
-	char motEnvoye[10];
-	char motRecu[10];
+
+	char reponseEnvoyee[200];
+	char questionRecue[500];
 	int iResult;
 
 	//--------------------------------------------
@@ -71,12 +77,18 @@ int __cdecl main(int argc, char **argv)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;  // Protocole utilisé par le serveur
 
-									  // On indique le nom et le port du serveur auquel on veut se connecter
-									  //char *host = "L4708-XX";
-									  //char *host = "L4708-XX.lerb.polymtl.ca";
-									  //char *host = "add_IP locale";
-	char *host = "132.207.29.XXX";
-	char *port = "10000";
+
+	char *host = nullptr;
+	char *port = nullptr;
+	bool clientConnecte = false;
+
+	while(!clientConnecte)
+	{
+			
+	intialiserClient(); // On recueuille les informations du serveur
+
+	host = ip;					// Ip et port du serveur
+	port = portServeur;
 
 	// getaddrinfo obtient l'adresse IP du host donné
 	iResult = getaddrinfo(host, port, &hints, &result);
@@ -85,6 +97,8 @@ int __cdecl main(int argc, char **argv)
 		WSACleanup();
 		return 1;
 	}
+	
+
 	//---------------------------------------------------------------------		
 	//On parcours les adresses retournees jusqu'a trouver la premiere adresse IPV4
 	while ((result != NULL) && (result->ai_family != AF_INET))
@@ -93,14 +107,14 @@ int __cdecl main(int argc, char **argv)
 	//	if ((result != NULL) &&(result->ai_family==AF_INET)) result = result->ai_next;  
 
 	//-----------------------------------------
-	if (((result == NULL) || (result->ai_family != AF_INET))) {
-		freeaddrinfo(result);
-		printf("Impossible de recuperer la bonne adresse\n\n");
-		WSACleanup();
-		printf("Appuyez une touche pour finir\n");
-		getchar();
-		return 1;
-	}
+		if (((result == NULL) || (result->ai_family != AF_INET))) {
+			freeaddrinfo(result);
+			printf("Impossible de recuperer la bonne adresse\n\n");
+			WSACleanup();
+			printf("Appuyez une touche pour finir\n");
+			getchar();
+			return 1;
+		}
 
 	sockaddr_in *adresse;
 	adresse = (struct sockaddr_in *) result->ai_addr;
@@ -111,26 +125,68 @@ int __cdecl main(int argc, char **argv)
 	// On va se connecter au serveur en utilisant l'adresse qui se trouve dans
 	// la variable result.
 	iResult = connect(leSocket, result->ai_addr, (int)(result->ai_addrlen));
-	if (iResult == SOCKET_ERROR) {
-		printf("Impossible de se connecter au serveur %s sur le port %s\n\n", inet_ntoa(adresse->sin_addr), port);
-		freeaddrinfo(result);
-		WSACleanup();
-		printf("Appuyez une touche pour finir\n");
-		getchar();
-		return 1;
-	}
+		if (iResult == SOCKET_ERROR) {
+			printf("Impossible de se connecter au serveur %s sur le port %s\n\n", inet_ntoa(adresse->sin_addr), port);
+		}
+
+		else
+			clientConnecte = true;
+
+	}//while(clientConnecte)
+
 
 	printf("Connecte au serveur %s:%s\n\n", host, port);
 	freeaddrinfo(result);
 
+
+	
+
+
+	//------------------------------
+	// Maintenant, on va recevoir l' information envoyée par le serveur
+	iResult = recv(leSocket, questionRecue, sizeof(questionRecue), 0);
+	if (iResult > 0) {
+		printf("Nombre d'octets recus: %d\n", iResult);
+		questionRecue[iResult] = '\0';
+		printf("La question recue est %*s\n", iResult, questionRecue);
+	}
+	else
+	{
+		printf("Erreur de reception : %d\n", WSAGetLastError());
+	}
+
+
+	if (questionRecue == "Sondage expiré")
+	{
+		cout << "Le sondage a expiré" << endl;
+		return 1;
+	}
+
+
+	else
+	{
+
+
 	//----------------------------
-	// Demander à l'usager un mot a envoyer au serveur
-	printf("Saisir un mot de 7 lettres pour envoyer au serveur: ");
-	gets_s(motEnvoye);
+	// Demander à l'usager la reponse a envoyer au serveur
+
+
+	printf("Saisir une reponse a envoyer au professeur (max. 200 caractères): ");
+	gets_s(reponseEnvoyee);
+
+	int n = sizeof(reponseEnvoyee) / sizeof(char);
+
+	while ((n < 0) | (n>200))
+	{
+	    cout << "La taile de la reponse est inadéquate. Veuillez saisir de nouveau votre reponse (max. 200 caractères)" << endl;
+		cin >> reponseEnvoyee;
+		n = sizeof(reponseEnvoyee) / sizeof(char);
+	}
+
 
 	//-----------------------------
-	// Envoyer le mot au serveur
-	iResult = send(leSocket, motEnvoye, 7, 0);
+	// Envoyer la réponse au serveur
+	iResult = send(leSocket, reponseEnvoyee, sizeof(reponseEnvoyee), 0);
 	if (iResult == SOCKET_ERROR) {
 		printf("Erreur du send: %d\n", WSAGetLastError());
 		closesocket(leSocket);
@@ -143,17 +199,7 @@ int __cdecl main(int argc, char **argv)
 
 	printf("Nombre d'octets envoyes : %ld\n", iResult);
 
-	//------------------------------
-	// Maintenant, on va recevoir l' information envoyée par le serveur
-	iResult = recv(leSocket, motRecu, 7, 0);
-	if (iResult > 0) {
-		printf("Nombre d'octets recus: %d\n", iResult);
-		motRecu[iResult] = '\0';
-		printf("Le mot recu est %*s\n", iResult, motRecu);
-	}
-	else {
-		printf("Erreur de reception : %d\n", WSAGetLastError());
-	}
+	} // else on répond
 
 	// cleanup
 	closesocket(leSocket);

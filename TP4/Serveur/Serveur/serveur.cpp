@@ -4,15 +4,15 @@ Authors: Yanis Khati , Nadir Faci
 
 #undef UNICODE
 
-
-
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <winsock2.h>
+#include <fstream>
+#include <istream>
 #include <iostream>
+//#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+
 #include <algorithm>
 #include <strstream>
-#include <iostream>
-#include <fstream>
+
 #include <string>   
 #include <ctime>
 
@@ -176,8 +176,10 @@ void intialiserServeur() {
 	int n = sizeof(question) / sizeof(char);
 	while ( (n < 0) | (n>500))
 	{
+		
 		cout << "La taile de la question est inadéquate. Veuillez saisir de nouveau votre question (maximum 500 caractères)" << endl;
 		cin >> duree;
+		n = sizeof(question) / sizeof(char);
 	}
 
 }
@@ -199,7 +201,7 @@ void writeAnswer(char* ip, int port, char* reponse)
 			fichier.close();  // on referme le fichier
 		}
 		else  // sinon
-			cerr << "Erreur à l'ouverture !" << endl;
+			cerr << "Erreur à l'ouverture de journal.txt !" << endl;
 }
 
 //Vérifie si le sondage est toujours actif
@@ -283,29 +285,47 @@ int main(void)
 
 	while (sondageActif) {
 
-		if (!verifierTimer(duree, startTimer))
-			sondageActif = false;
-
-
-
 		sockaddr_in sinRemote;
 		int nAddrSize = sizeof(sinRemote);
 		// Create a SOCKET for accepting incoming requests.
 		// Accept the connection.
-		SOCKET sd = accept(ServerSocket, (sockaddr*)&sinRemote, &nAddrSize);
-		if (sd != INVALID_SOCKET) {
-			cout << "Connection acceptee De : " <<
-				inet_ntoa(sinRemote.sin_addr) << ":" <<
-				ntohs(sinRemote.sin_port) << "." <<
-				endl;
 
-			DWORD nThreadID;
-			CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+		SOCKET sd;
+
+		if (verifierTimer(duree, startTimer)) {								//Si le sondage est terminé, on accepte plus de connections
+			sd = accept(ServerSocket, (sockaddr*)&sinRemote, &nAddrSize);
 		}
-		else {
-			cerr << WSAGetLastErrorMessage("Echec d'une connection.") <<
-				endl;
-			 return 1;
+
+		if (sd != INVALID_SOCKET) 
+		{
+
+			if (verifierTimer(duree, startTimer)) {						//Si le sondage est terminé, on accepte plus de connections
+				cout << "Connection acceptee De : " <<
+					inet_ntoa(sinRemote.sin_addr) << ":" <<
+					ntohs(sinRemote.sin_port) << "." <<
+					endl;
+			}
+
+
+			if (!verifierTimer(duree, startTimer)) // Si le sondage est expiré
+			{
+				question = "Sondage expiré"; // on notifie le client
+				DWORD nThreadID;
+				CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+				sondageActif = false;
+			}
+
+			else 
+			{
+				DWORD nThreadID;
+				CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+			}
+		}
+
+		else 
+		{
+				cerr << WSAGetLastErrorMessage("Echec d'une connection.") << endl;
+				return 1;
 		}
 	}
 
@@ -327,7 +347,14 @@ DWORD WINAPI recevoirReponse(void* sd_)
 {
 	SOCKET sd = (SOCKET)sd_;
 
-	send(sd, question,sizeof(question), 0); //sizeof(question) ou bien 500 ,a verifier
+	if (question == "Sondage expiré") 
+	{
+		send(sd, question, sizeof(question), 0); //sizeof(question) ou bien 500 ,a verifier
+		return 1;
+	}
+
+	send(sd, question, sizeof(question), 0); //sizeof(question) ou bien 500 ,a verifier
+
 
 	// Read Data from client
 	char readBuffer[200];
