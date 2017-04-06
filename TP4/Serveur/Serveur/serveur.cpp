@@ -150,27 +150,27 @@ void intialiserServeur() {
 	cout << "Veuillez entrer l'adresse IP du poste" << endl;
 	cin.get(ip,256);
 
-	cout << "Veuillez entrer un port d'écoute entre 10000 et 10050" << endl;
+	cout << "Veuillez entrer un port d'ecoute entre 10000 et 10050" << endl;
 	cin >> port;
 
 	while ((port < 10000) | (port > 10050))
 	{
-		cout << "Numéro de port érroné. Veuillez entrer un port d'écoute entre 10000 et 10050" << endl;
+		cout << "Numero de port errone. Veuillez entrer un port d'ecoute entre 10000 et 10050" << endl;
 		cin >> port;
 	}
 
 
-	cout << "Veuillez entrer la durée du sondage (s)" << endl;
+	cout << "Veuillez entrer la duree du sondage (s)" << endl;
 	cin >> duree;
 
 	while (duree < 0)
 	{
-		cout << "Duree érronée. Veuillez entrer une durée positive" << endl;
+		cout << "Duree erronee. Veuillez entrer une duree positive" << endl;
 		cin >> duree;
 	}
 
 	cin.ignore();
-	cout << "Veuillez saisir la question du sondage (maximum 500 caractères)" << endl;
+	cout << "Veuillez saisir la question du sondage (maximum 500 caracteres)" << endl;
 	cin.get(question,500);
 
 	
@@ -178,7 +178,7 @@ void intialiserServeur() {
 	while ( (n < 0) | (n>500))
 	{
 		
-		cout << "La taile de la question est inadéquate. Veuillez saisir de nouveau votre question (maximum 500 caractères)" << endl;
+		cout << "La taile de la question est inadequate. Veuillez saisir de nouveau votre question (maximum 500 caracteres)" << endl;
 		cin >> duree;
 		n = sizeof(question) / sizeof(char);
 	}
