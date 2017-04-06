@@ -5,9 +5,8 @@ Authors: Yanis Khati , Nadir Faci
 #undef UNICODE
 
 #include <fstream>
-#include <istream>
 #include <iostream>
-//#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
 
 #include <algorithm>
@@ -138,18 +137,18 @@ const char* WSAGetLastErrorMessage(const char* pcMessagePrefix, int nErrorID = 0
 }
 
 
-char* ip;			// IP du serveur
+char ip[256];			// IP du serveur
 int port;			// Port d'écoute
 unsigned int duree; //durée du sondage
-char* question; // question du sondage
+char question[500]; // question du sondage
 
 // Fonction qui demande a l'utilisateur les informations du serveur, 
 // la durée du sondage et la question
 void intialiserServeur() {
 
-
+	
 	cout << "Veuillez entrer l'adresse IP du poste" << endl;
-	cin >> ip;
+	cin.get(ip,256);
 
 	cout << "Veuillez entrer un port d'écoute entre 10000 et 10050" << endl;
 	cin >> port;
@@ -170,9 +169,11 @@ void intialiserServeur() {
 		cin >> duree;
 	}
 
+	cin.ignore();
 	cout << "Veuillez saisir la question du sondage (maximum 500 caractères)" << endl;
-	cin >> question;
+	cin.get(question,500);
 
+	
 	int n = sizeof(question) / sizeof(char);
 	while ( (n < 0) | (n>500))
 	{
@@ -181,6 +182,8 @@ void intialiserServeur() {
 		cin >> duree;
 		n = sizeof(question) / sizeof(char);
 	}
+
+	
 
 }
 
@@ -247,7 +250,7 @@ int main(void)
 	// la durée du sondage et la question
 	intialiserServeur();
 
-
+	
 	//----------------------
 
 	//Recuperation de l'adresse locale
@@ -255,17 +258,25 @@ int main(void)
 	char hostname[256];
 	gethostname(hostname, sizeof(hostname));
 	thisHost = gethostbyname(ip);
-	char* ip;
-	ip = inet_ntoa(*(struct in_addr*) *thisHost->h_addr_list);
-	printf("Adresse locale trouvee %s : \n\n", ip);
+
+	char* IP;
+	IP = inet_ntoa(*(struct in_addr*) *thisHost->h_addr_list);
+	printf("Adresse locale trouvee %s : \n\n", IP);
 	sockaddr_in service;
 	service.sin_family = AF_INET;
 
 	//service.sin_addr.s_addr = inet_addr("127.0.0.1");
 	//	service.sin_addr.s_addr = INADDR_ANY;
-	service.sin_addr.s_addr = inet_addr(ip);
+	service.sin_addr.s_addr = inet_addr(IP);
 	service.sin_port = htons(port);
 
+	if (bind(ServerSocket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
+		cerr << WSAGetLastErrorMessage("bind() failed.") << endl;
+		closesocket(ServerSocket);
+		WSACleanup();
+		return 1;
+	}
+	
 
 	//----------------------
 	// Listen for incoming connection requests.
@@ -273,15 +284,19 @@ int main(void)
 	if (listen(ServerSocket, 30) == SOCKET_ERROR) {
 		cerr << WSAGetLastErrorMessage("Error listening on socket.") << endl;
 		closesocket(ServerSocket);
-		WSACleanup();
+		WSACleanup();	
 		return 1;
 	}
 
 	
+
 	startTimer = time(0); //initialiser le timer 
 	bool sondageActif = true;
 
 	printf("En attente des connections des clients sur le port %d...\n\n", ntohs(service.sin_port));
+
+
+
 
 	while (sondageActif) {
 
@@ -299,7 +314,7 @@ int main(void)
 		if (sd != INVALID_SOCKET) 
 		{
 
-			if (verifierTimer(duree, startTimer)) {						//Si le sondage est terminé, on accepte plus de connections
+			if (!verifierTimer(duree, startTimer)) {						//Si le sondage est terminé, on accepte plus de connections
 				cout << "Connection acceptee De : " <<
 					inet_ntoa(sinRemote.sin_addr) << ":" <<
 					ntohs(sinRemote.sin_port) << "." <<
@@ -307,9 +322,10 @@ int main(void)
 			}
 
 
-			if (!verifierTimer(duree, startTimer)) // Si le sondage est expiré
+			if (verifierTimer(duree, startTimer)) // Si le sondage est expiré
 			{
-				question = "Sondage expiré"; // on notifie le client
+				strcpy_s(question, "Sondage expiré");
+                // on notifie le client
 				DWORD nThreadID;
 				CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
 				sondageActif = false;

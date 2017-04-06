@@ -19,15 +19,15 @@ using namespace std;
 #pragma comment(lib, "ws2_32.lib")
 
 
-char* ip;			// IP du serveur
-char* portServeur;			// Port d'écoute
+char ip[256];			// IP du serveur
+int portServeur;			// Port d'écoute
 
 // Fonction qui demande au client les informations du serveur
-void intialiserClient() {
+void initialiserClient() {
 
 
 	cout << "Veuillez entrer l'adresse IP du serveur" << endl;
-	cin >> ip;
+	cin.get(ip, 256);
 
 	cout << "Veuillez entrer un port du serveur entre 10000 et 10050" << endl;
 	cin >> portServeur;
@@ -78,18 +78,18 @@ int __cdecl main(int argc, char **argv)
 	hints.ai_protocol = IPPROTO_TCP;  // Protocole utilisé par le serveur
 
 
-	char *host = nullptr;
-	char *port = nullptr;
+	const char *port;
+	char *host;
+	
+	initialiserClient(); // On recueuille les informations du serveur
+	port = to_string(portServeur).c_str();      // Ip et port du serveur
+	host = ip;
+
+	
 	bool clientConnecte = false;
 
 	while(!clientConnecte)
 	{
-			
-	intialiserClient(); // On recueuille les informations du serveur
-
-	host = ip;					// Ip et port du serveur
-	port = portServeur;
-
 	// getaddrinfo obtient l'adresse IP du host donné
 	iResult = getaddrinfo(host, port, &hints, &result);
 	if (iResult != 0) {
@@ -98,7 +98,7 @@ int __cdecl main(int argc, char **argv)
 		return 1;
 	}
 	
-
+	system("pause");
 	//---------------------------------------------------------------------		
 	//On parcours les adresses retournees jusqu'a trouver la premiere adresse IPV4
 	while ((result != NULL) && (result->ai_family != AF_INET))
