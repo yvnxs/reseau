@@ -11,7 +11,6 @@ Authors: Yanis Khati , Nadir Faci
 
 #include <algorithm>
 #include <strstream>
-
 #include <string>   
 #include <ctime>
 
@@ -171,13 +170,12 @@ void intialiserServeur() {
 
 	cin.ignore();
 	cout << "Veuillez saisir la question du sondage (maximum 500 caracteres)" << endl;
-	cin.get(question,500);
+	gets_s(question);
 
 	
 	int n = sizeof(question) / sizeof(char);
 	while ( (n < 0) | (n>500))
-	{
-		
+	{		
 		cout << "La taile de la question est inadequate. Veuillez saisir de nouveau votre question (maximum 500 caracteres)" << endl;
 		cin >> duree;
 		n = sizeof(question) / sizeof(char);
@@ -195,7 +193,7 @@ void writeAnswer(char* ip, int port, char* reponse)
 	string line = (string)ip + " : " +  to_string(port) + " - " + reponse;
 	cout << line << endl;
 
-	ofstream fichier("journal.txt", ios::out);  //déclaration du flux et ouverture du fichier
+	ofstream fichier("journal.txt", ios_base::app | ios_base::out);  //déclaration du flux et ouverture du fichier
 
 		if (fichier)  // si l'ouverture a réussi
 		{
@@ -204,24 +202,26 @@ void writeAnswer(char* ip, int port, char* reponse)
 			fichier.close();  // on referme le fichier
 		}
 		else  // sinon
-			cerr << "Erreur à l'ouverture de journal.txt !" << endl;
+			cerr << "Erreur a l'ouverture de journal.txt !" << endl;
 }
 
 //Vérifie si le sondage est toujours actif
-bool verifierTimer(int duree, time_t start) {
-
+bool TimerExpire(int duree, time_t start) {
 
 	if(difftime(time(0), start)<duree)   
-		return 1;
-
-	else 
 		return 0;
 
+	else 
+		return 1;
 }
 
-time_t startTimer;
-int main(void)
-{
+time_t startTimer; // variable qui stocke le temps au debut du décompte
+
+
+int main(void){
+
+
+
 	//----------------------
 	// Initialize Winsock.
 	WSADATA wsaData;
@@ -265,15 +265,14 @@ int main(void)
 	sockaddr_in service;
 	service.sin_family = AF_INET;
 
-	//service.sin_addr.s_addr = inet_addr("127.0.0.1");
-	//	service.sin_addr.s_addr = INADDR_ANY;
 	service.sin_addr.s_addr = inet_addr(IP);
 	service.sin_port = htons(port);
 
 	if (bind(ServerSocket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
-		cerr << WSAGetLastErrorMessage("bind() failed.") << endl;
+		cerr << WSAGetLastErrorMessage("bind() failed. Check your IP adress validity") << endl;
 		closesocket(ServerSocket);
 		WSACleanup();
+		system("pause");
 		return 1;
 	}
 	
@@ -285,20 +284,21 @@ int main(void)
 		cerr << WSAGetLastErrorMessage("Error listening on socket.") << endl;
 		closesocket(ServerSocket);
 		WSACleanup();	
+		system("pause");
 		return 1;
 	}
 
 	
 
 	startTimer = time(0); //initialiser le timer 
+
 	bool sondageActif = true;
-
-	printf("En attente des connections des clients sur le port %d...\n\n", ntohs(service.sin_port));
-
-
 
 
 	while (sondageActif) {
+
+if (!TimerExpire(duree, startTimer))  // Si le sondage n'est pas encore expiré
+			printf("En attente des connections des clients sur le port %d...\n\n", ntohs(service.sin_port));
 
 		sockaddr_in sinRemote;
 		int nAddrSize = sizeof(sinRemote);
@@ -307,48 +307,51 @@ int main(void)
 
 		SOCKET sd;
 
-		if (verifierTimer(duree, startTimer)) {								//Si le sondage est terminé, on accepte plus de connections
-			sd = accept(ServerSocket, (sockaddr*)&sinRemote, &nAddrSize);
-		}
-
-		if (sd != INVALID_SOCKET) 
-		{
-
-			if (!verifierTimer(duree, startTimer)) {						//Si le sondage est terminé, on accepte plus de connections
-				cout << "Connection acceptee De : " <<
-					inet_ntoa(sinRemote.sin_addr) << ":" <<
-					ntohs(sinRemote.sin_port) << "." <<
-					endl;
-			}
-
-
-			if (verifierTimer(duree, startTimer)) // Si le sondage est expiré
+		
+		sd = accept(ServerSocket, (sockaddr*)&sinRemote, &nAddrSize);
+		
+			if (sd != INVALID_SOCKET) 
 			{
-				strcpy_s(question, "Sondage expiré");
-                // on notifie le client
-				DWORD nThreadID;
-				CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
-				sondageActif = false;
+
+					if (!TimerExpire(duree, startTimer)) {						//Si le sondage est terminé, on affiche pas que la connection est acceptée
+						cout << "Connection acceptee De : " <<
+							inet_ntoa(sinRemote.sin_addr) << ":" <<
+							ntohs(sinRemote.sin_port) << "." <<
+							endl;
+
+						DWORD nThreadID;
+						CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+
+					}
+
+					else									// Si le sondage est expiré on envoie un message d'expiration au client
+					{
+						strcpy_s(question, "Sondage expire");
+						// on notifie le client
+						DWORD nThreadID;
+						CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+
+						cout << "Le sondage est termine! Le temps imparti s'est ecoule. Connection rejetée" << endl;
+						
+						//sondageActif = false;  --- Si on decommente, les clients ne recevront plus de message d'expiration, le socket sera fermé.
+					}
+		
 			}
 
 			else 
 			{
-				DWORD nThreadID;
-				CreateThread(0, 0, recevoirReponse, (void*)sd, 0, &nThreadID);
+					cerr << WSAGetLastErrorMessage("Echec d'une connection.") << endl;
+					system("pause");
+					return 1;
 			}
-		}
 
-		else 
-		{
-				cerr << WSAGetLastErrorMessage("Echec d'une connection.") << endl;
-				return 1;
-		}
-	}
+	}   // ------while (sondageActif)
 
 	// No longer need server socket
 	closesocket(ServerSocket);
 
 	WSACleanup();
+	system("pause");
 	return 0;
 
 }
@@ -363,13 +366,13 @@ DWORD WINAPI recevoirReponse(void* sd_)
 {
 	SOCKET sd = (SOCKET)sd_;
 
-	if (question == "Sondage expiré") 
+	if (question == "Sondage expire")    //Si le sondage est expiré, on notifie le client
 	{
-		send(sd, question, sizeof(question), 0); //sizeof(question) ou bien 500 ,a verifier
+		send(sd, question, sizeof(question), 0); 
 		return 1;
 	}
 
-	send(sd, question, sizeof(question), 0); //sizeof(question) ou bien 500 ,a verifier
+	send(sd, question, sizeof(question), 0); // sinon on envoie la question au client
 
 
 	// Read Data from client
@@ -377,17 +380,21 @@ DWORD WINAPI recevoirReponse(void* sd_)
 	int readBytes;
 
 	readBytes = recv(sd, readBuffer, 200, 0);
-	if (readBytes > 0) {
-		cout << "Received " << readBytes << " bytes from client." << endl;
-		cout << "Received " << readBuffer << " from client." << endl;
 
-		writeAnswer(ip,port,readBuffer);
-		
-	}
-	else if (readBytes == SOCKET_ERROR) {
-		cout << WSAGetLastErrorMessage("Echec de la reception !") << endl;
-	}
+		if (readBytes > 0) 
+		{
+			cout << "Received " << readBuffer << " from client." << endl;
+			writeAnswer(ip,port,readBuffer);	
+		}
+
+		else if (readBytes == SOCKET_ERROR) 
+		{
+			cout << WSAGetLastErrorMessage("Echec de la reception !") << endl;
+		}
+
 	closesocket(sd);
 
 	return 0;
 }
+
+
